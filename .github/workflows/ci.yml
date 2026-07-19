@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+    branches: ["main", "master"]
+  workflow_call: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11"]
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint (ruff)
+        run: |
+          pip install ruff
+          ruff check . --output-format=github
+
+      - name: Verify model artifact is present
+        run: |
+          if [ ! -f models/model.pkl ]; then
+            echo "models/model.pkl is missing — run 'python src/train.py' and commit it."
+            exit 1
+          fi
+
+      - name: Run tests
+        run: pytest tests/ -v --junitxml=pytest-results.xml
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-results-${{ matrix.python-version }}
+          path: pytest-results.xml
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Build Docker image (no push — just verify it builds)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: water-potability-api:ci
