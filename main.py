@@ -7,7 +7,6 @@ dataset. See README.md for how to (re)train the model and run this service.
 """
 import logging
 import os
-import sys
 import time
 from contextlib import asynccontextmanager
 
