@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Water Potability Reader</title>
+<style>
+  :root{
+    --ink:#0e2a2f;
+    --paper:#eef4f2;
+    --line:#c7d6d2;
+    --teal:#1f6f6b;
+    --teal-deep:#123f3d;
+    --amber:#c97a2b;
+    --safe:#2f7a4f;
+    --danger:#a33d2e;
+    --mono: "IBM Plex Mono","SF Mono",Consolas,monospace;
+    --serif: "Iowan Old Style","Georgia",serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--mono);
+    font-size:15px;
+    line-height:1.5;
+    padding:32px 20px 60px;
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 28px 28px;
+    background-position: -1px -1px;
+  }
+  .sheet{
+    max-width:880px;
+    margin:0 auto;
+    background:#fbfdfc;
+    border:1px solid var(--line);
+    box-shadow: 0 1px 0 var(--line), 0 18px 40px -28px rgba(14,42,47,0.35);
+  }
+  header{
+    padding:26px 32px 20px;
+    border-bottom:2px solid var(--ink);
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  header h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:28px;
+    margin:0 0 4px;
+    letter-spacing:0.2px;
+  }
+  header p{margin:0;color:var(--teal-deep);font-size:12.5px;letter-spacing:0.4px;}
+  .sample-id{
+    text-align:right;
+    font-size:11px;
+    color:#6b807d;
+    text-transform:uppercase;
+    letter-spacing:1px;
+  }
+  .sample-id b{display:block;color:var(--ink);font-size:13px;letter-spacing:0;margin-top:2px;}
+
+  form{padding:26px 32px 8px;}
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(3, 1fr);
+    gap:18px 22px;
+  }
+  @media (max-width:640px){ .grid{grid-template-columns:1fr 1fr;} }
+
+  .field label{
+    display:flex;
+    justify-content:space-between;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.6px;
+    color:var(--teal-deep);
+    margin-bottom:6px;
+  }
+  .field label .unit{color:#8a9d9a;text-transform:none;letter-spacing:0;}
+  .field input{
+    width:100%;
+    border:none;
+    border-bottom:1.5px solid #9fb6b2;
+    background:transparent;
+    padding:6px 2px;
+    font-family:var(--mono);
+    font-size:16px;
+    color:var(--ink);
+    outline:none;
+  }
+  .field input::placeholder{color:#b7c6c3;}
+  .field input:focus{border-bottom-color:var(--teal);}
+  .field input:invalid:not(:placeholder-shown){border-bottom-color:var(--danger);}
+  .field .hint{font-size:10.5px;color:#8a9d9a;margin-top:4px;}
+
+  .actions{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    padding:22px 32px 30px;
+    flex-wrap:wrap;
+  }
+  button{
+    font-family:var(--mono);
+    font-size:13px;
+    letter-spacing:0.6px;
+    text-transform:uppercase;
+    padding:13px 22px;
+    border:1.5px solid var(--ink);
+    background:var(--ink);
+    color:var(--paper);
+    cursor:pointer;
+    transition:transform .12s ease;
+  }
+  button:hover{transform:translateY(-1px);}
+  button:active{transform:translateY(0);}
+  button:disabled{opacity:0.5;cursor:progress;}
+  .ghost-btn{
+    background:transparent;
+    color:var(--teal-deep);
+    border:1.5px solid var(--line);
+  }
+  .note{font-size:11.5px;color:#7c908d;}
+
+  #result{
+    margin:0 32px 32px;
+    border-top:1px dashed var(--line);
+    padding-top:22px;
+    display:none;
+  }
+  #result.show{display:block;}
+  .verdict{
+    display:flex;
+    align-items:baseline;
+    gap:16px;
+    flex-wrap:wrap;
+  }
+  .verdict .dot{
+    width:12px;height:12px;border-radius:50%;
+    display:inline-block;
+    margin-right:8px;
+    position:relative;top:-1px;
+  }
+  .verdict h2{
+    font-family:var(--serif);
+    font-size:26px;
+    margin:0;
+  }
+  .verdict .prob{
+    font-size:13px;
+    color:#6b807d;
+  }
+  .bar-row{margin-top:16px;}
+  .bar-track{
+    height:10px;
+    background:#e2e9e7;
+    border:1px solid var(--line);
+    position:relative;
+    overflow:hidden;
+  }
+  .bar-fill{
+    height:100%;
+    background:linear-gradient(90deg, var(--danger), var(--amber) 50%, var(--safe));
+    width:0%;
+    transition:width .5s ease;
+  }
+  .bar-labels{
+    display:flex;justify-content:space-between;
+    font-size:10.5px;color:#8a9d9a;margin-top:4px;
+  }
+  .confidence-tag{
+    display:inline-block;
+    margin-top:14px;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.6px;
+    padding:4px 10px;
+    border:1px solid var(--line);
+    color:var(--teal-deep);
+  }
+  .error-box{
+    margin-top:14px;
+    font-size:13px;
+    color:var(--danger);
+    border-left:3px solid var(--danger);
+    padding-left:10px;
+  }
+  footer{
+    padding:14px 32px 26px;
+    font-size:11px;
+    color:#8a9d9a;
+    border-top:1px solid var(--line);
+  }
+  footer a{color:var(--teal-deep);}
+</style>
+</head>
+<body>
+  <div class="sheet">
+    <header>
+      <div>
+        <h1>Water Potability Reader</h1>
+        <p>NINE-PARAMETER FIELD ASSAY &middot; ML-ASSISTED</p>
+      </div>
+      <div class="sample-id">
+        SAMPLE
+        <b id="sampleId">—</b>
+      </div>
+    </header>
+
+    <form id="predictForm" novalidate>
+      <div class="grid" id="grid"><!-- fields injected by JS --></div>
+
+      <div class="actions">
+        <button type="submit" id="submitBtn">Run Assay</button>
+        <button type="button" class="ghost-btn" id="fillDemo">Load Typical Sample</button>
+        <button type="button" class="ghost-btn" id="clearBtn">Clear</button>
+        <span class="note" id="statusNote"></span>
+      </div>
+    </form>
+
+    <div id="result">
+      <div class="verdict">
+        <span><span class="dot" id="dot"></span><h2 id="verdictText">—</h2></span>
+        <span class="prob" id="probText"></span>
+      </div>
+      <div class="bar-row">
+        <div class="bar-track"><div class="bar-fill" id="barFill"></div></div>
+        <div class="bar-labels"><span>Not potable</span><span>Potable</span></div>
+      </div>
+      <span class="confidence-tag" id="confTag"></span>
+      <div class="error-box" id="errorBox" style="display:none;"></div>
+    </div>
+
+    <footer>
+      Model: RandomForest pipeline (median-imputed, standardized) trained on the Kaggle Water Potability dataset.
+      Predictions are indicative only — always confirm with certified lab testing before consumption decisions.
+      &middot; <a href="/docs">API docs</a>
+    </footer>
+  </div>
+
+<script>
+const FIELDS = [
+  {key:"ph", label:"pH", unit:"0–14", min:0, max:14, step:0.01, placeholder:"7.10"},
+  {key:"Hardness", label:"Hardness", unit:"mg/L", min:0, max:1000, step:0.1, placeholder:"196.9"},
+  {key:"Solids", label:"Solids", unit:"ppm", min:0, max:100000, step:1, placeholder:"20927.8"},
+  {key:"Chloramines", label:"Chloramines", unit:"ppm", min:0, max:50, step:0.01, placeholder:"7.10"},
+  {key:"Sulfate", label:"Sulfate", unit:"mg/L", min:0, max:1000, step:0.1, placeholder:"333.1"},
+  {key:"Conductivity", label:"Conductivity", unit:"\u03bcS/cm", min:0, max:2000, step:0.1, placeholder:"421.9"},
+  {key:"Organic_carbon", label:"Organic carbon", unit:"ppm", min:0, max:100, step:0.01, placeholder:"14.20"},
+  {key:"Trihalomethanes", label:"Trihalomethanes", unit:"\u03bcg/L", min:0, max:250, step:0.01, placeholder:"66.60"},
+  {key:"Turbidity", label:"Turbidity", unit:"NTU", min:0, max:20, step:0.01, placeholder:"3.90"},
+];
+
+const DEMO_SAMPLE = {
+  ph:7.1, Hardness:196.9, Solids:20927.8, Chloramines:7.1, Sulfate:333.1,
+  Conductivity:421.9, Organic_carbon:14.2, Trihalomethanes:66.6, Turbidity:3.9
+};
+
+const grid = document.getElementById("grid");
+FIELDS.forEach(f => {
+  const wrap = document.createElement("div");
+  wrap.className = "field";
+  wrap.innerHTML = `
+    <label for="${f.key}">${f.label} <span class="unit">${f.unit}</span></label>
+    <input type="number" id="${f.key}" name="${f.key}" min="${f.min}" max="${f.max}" step="${f.step}" placeholder="${f.placeholder}" />
+    <div class="hint">leave blank to auto-fill from dataset median</div>
+  `;
+  grid.appendChild(wrap);
+});
+
+function randomSampleId(){
+  const n = Math.floor(Math.random()*9000)+1000;
+  return "WP-" + n;
+}
+document.getElementById("sampleId").textContent = randomSampleId();
+
+const form = document.getElementById("predictForm");
+const resultBox = document.getElementById("result");
+const submitBtn = document.getElementById("submitBtn");
+const statusNote = document.getElementById("statusNote");
+const errorBox = document.getElementById("errorBox");
+
+document.getElementById("fillDemo").addEventListener("click", () => {
+  Object.entries(DEMO_SAMPLE).forEach(([k,v]) => { document.getElementById(k).value = v; });
+});
+document.getElementById("clearBtn").addEventListener("click", () => {
+  FIELDS.forEach(f => document.getElementById(f.key).value = "");
+  resultBox.classList.remove("show");
+  statusNote.textContent = "";
+});
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  errorBox.style.display = "none";
+  const payload = {};
+  FIELDS.forEach(f => {
+    const v = document.getElementById(f.key).value;
+    if (v !== "") payload[f.key] = parseFloat(v);
+  });
+
+  submitBtn.disabled = true;
+  statusNote.textContent = "Running assay…";
+
+  try {
+    const resp = await fetch("/predict", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(payload)
+    });
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      resultBox.classList.add("show");
+      errorBox.style.display = "block";
+      errorBox.textContent = typeof data.detail === "string"
+        ? data.detail
+        : "Check the highlighted fields — one or more values are out of the plausible range.";
+      document.getElementById("verdictText").textContent = "Assay incomplete";
+      document.getElementById("probText").textContent = "";
+      document.getElementById("barFill").style.width = "0%";
+      document.getElementById("confTag").textContent = "";
+      document.getElementById("dot").style.background = "#b7c6c3";
+      return;
+    }
+
+    const pct = Math.round(data.probability_potable * 100);
+    resultBox.classList.add("show");
+    document.getElementById("verdictText").textContent = data.label;
+    document.getElementById("probText").textContent = `${pct}% probability potable`;
+    document.getElementById("barFill").style.width = `${pct}%`;
+    document.getElementById("confTag").textContent = `${data.confidence} confidence`;
+    document.getElementById("dot").style.background = data.potable ? "#2f7a4f" : "#a33d2e";
+    statusNote.textContent = "";
+  } catch (err) {
+    resultBox.classList.add("show");
+    errorBox.style.display = "block";
+    errorBox.textContent = "Could not reach the prediction service. Is the API running?";
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
